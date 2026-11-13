@@ -1,0 +1,36 @@
+name: Sync upstream
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Upstream branch or tag to update to (default: latest release, else main)'
+        required: false
+
+permissions:
+  contents: write
+
+env:
+  UPSTREAM: sums001/OpenInbox
+
+jobs:
+  sync:
+    if: github.repository != 'sums001/OpenInbox'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Copy upstream files
+        run: node scripts/sync-upstream.mjs "${{ inputs.ref }}"
+      - name: Commit and push
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then echo "Already up to date."; exit 0; fi
+          git config user.name "openinbox-sync[bot]"
+          git config user.email "openinbox-sync@users.noreply.github.com"
+          git add -A
+          git commit -m "Update OpenInbox to $(cat .upstream-version 2>/dev/null || echo latest)"
+          git push
